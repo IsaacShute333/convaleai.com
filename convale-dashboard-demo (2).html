@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Convale Dashboard — Demo</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #0f1117;
+      color: #e0e0e0;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .sidebar {
+      width: 210px; flex-shrink: 0; background: #1a1d27;
+      border-right: 1px solid #2a2d3a; display: flex;
+      flex-direction: column; padding: 20px 0;
+    }
+    .sidebar-logo { padding: 0 20px 20px; border-bottom: 1px solid #2a2d3a; margin-bottom: 10px; }
+    .sidebar-logo span { font-size: 16px; font-weight: bold; color: #ffffff; }
+    .sidebar-logo small { display: block; font-size: 11px; color: #666; margin-top: 2px; }
+    .nav-label { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 1px; padding: 14px 20px 4px; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 20px; font-size: 13px; color: #888;
+      cursor: pointer; transition: background 0.15s;
+      border-right: 2px solid transparent;
+    }
+    .nav-item:hover { background: #22253a; color: #e0e0e0; }
+    .nav-item.active { background: #22253a; color: #ffffff; font-weight: 600; border-right: 2px solid #7c83fd; }
+    .nav-item svg { width: 16px; height: 16px; opacity: 0.6; flex-shrink: 0; }
+    .nav-item.active svg { opacity: 1; }
+
+    .main { flex: 1; overflow-y: auto; padding: 28px; }
+    .page { display: none; }
+    .page.active { display: block; }
+    .page-title { font-size: 20px; font-weight: bold; color: #ffffff; margin-bottom: 4px; }
+    .page-sub { font-size: 13px; color: #666; margin-bottom: 24px; }
+
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+    .stat { background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 12px; padding: 16px 18px; }
+    .stat-label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+    .stat-value { font-size: 26px; font-weight: bold; color: #ffffff; }
+    .stat-delta { font-size: 11px; margin-top: 4px; color: #2ecc71; }
+    .stat-delta.neutral { color: #666; }
+
+    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 24px; }
+    .chart-card { background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 12px; padding: 18px; }
+    .chart-title { font-size: 14px; font-weight: 600; color: #ffffff; margin-bottom: 2px; }
+    .chart-sub { font-size: 11px; color: #666; margin-bottom: 14px; }
+    .legend { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; font-size: 11px; color: #888; }
+    .legend span { display: flex; align-items: center; gap: 5px; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+    .leads-section { background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 12px; padding: 18px; }
+    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .section-title { font-size: 14px; font-weight: 600; color: #ffffff; }
+    .section-count { font-size: 12px; color: #666; }
+    .lead-row { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid #2a2d3a; }
+    .lead-row:last-child { border-bottom: none; }
+    .avatar { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; flex-shrink: 0; }
+    .lead-info { flex: 1; min-width: 0; }
+    .lead-name { font-size: 13px; font-weight: 600; color: #e0e0e0; }
+    .lead-time { font-size: 11px; color: #555; margin-top: 2px; }
+    .score-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex-shrink: 0; }
+    .score-top { display: flex; align-items: center; gap: 8px; }
+    .score-num { font-size: 13px; font-weight: 600; }
+    .score-tag { font-size: 10px; padding: 2px 9px; border-radius: 10px; font-weight: 600; }
+    .score-bar-bg { width: 90px; height: 4px; background: #2a2d3a; border-radius: 2px; overflow: hidden; }
+    .score-bar-fill { height: 4px; border-radius: 2px; }
+
+    .all-leads-layout { display: flex; gap: 16px; height: calc(100vh - 120px); }
+    .lead-list-panel {
+      width: 300px; flex-shrink: 0; background: #1a1d27;
+      border: 1px solid #2a2d3a; border-radius: 12px;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .lead-list-header { padding: 14px 16px; border-bottom: 1px solid #2a2d3a; }
+    .lead-list-header h3 { font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 10px; }
+    .filter-row { display: flex; gap: 8px; align-items: center; }
+    .filter-select {
+      flex: 1; background: #0f1117; border: 1px solid #2a2d3a;
+      border-radius: 8px; padding: 7px 10px; color: #e0e0e0;
+      font-size: 12px; outline: none; cursor: pointer;
+    }
+    .filter-select:focus { border-color: #7c83fd; }
+    .lead-bubbles { flex: 1; overflow-y: auto; padding: 10px; }
+    .lead-bubble {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: 10px; cursor: pointer;
+      transition: background 0.15s; margin-bottom: 4px; border: 1px solid transparent;
+    }
+    .lead-bubble:hover { background: #22253a; }
+    .lead-bubble.selected { background: #22253a; border-color: #7c83fd; }
+    .bubble-avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; flex-shrink: 0; }
+    .bubble-info { flex: 1; min-width: 0; }
+    .bubble-name { font-size: 13px; font-weight: 600; color: #e0e0e0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bubble-preview { font-size: 11px; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+    .bubble-score { font-size: 12px; font-weight: 600; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .bubble-score-num { font-size: 13px; font-weight: 700; }
+    .bubble-score-label { font-size: 9px; color: #555; }
+    .conversation-panel {
+      flex: 1; background: #1a1d27; border: 1px solid #2a2d3a;
+      border-radius: 12px; display: flex; flex-direction: column; overflow: hidden;
+    }
+    .convo-header { padding: 16px 20px; border-bottom: 1px solid #2a2d3a; display: flex; align-items: center; gap: 14px; }
+    .convo-header-avatar { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; flex-shrink: 0; }
+    .convo-header-info { flex: 1; }
+    .convo-header-name { font-size: 15px; font-weight: 600; color: #fff; }
+    .convo-header-sub { font-size: 11px; color: #666; margin-top: 2px; }
+    .convo-score-badge { padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+    .convo-messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+    .msg { display: flex; flex-direction: column; max-width: 70%; }
+    .msg.lead { align-self: flex-start; }
+    .msg.ai { align-self: flex-end; }
+    .msg-bubble { padding: 10px 14px; border-radius: 14px; font-size: 13px; line-height: 1.5; }
+    .msg.lead .msg-bubble { background: #22253a; color: #e0e0e0; border-bottom-left-radius: 4px; }
+    .msg.ai .msg-bubble { background: #7c83fd; color: #fff; border-bottom-right-radius: 4px; }
+    .msg-label { font-size: 10px; color: #555; margin-bottom: 4px; }
+    .msg.ai .msg-label { text-align: right; }
+    .msg-time { font-size: 10px; color: #555; margin-top: 4px; }
+    .msg.ai .msg-time { text-align: right; }
+    .convo-empty { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; color: #444; }
+    .convo-empty svg { width: 40px; height: 40px; opacity: 0.3; }
+    .convo-empty p { font-size: 13px; }
+
+    .profiles-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 16px;
+    }
+    .profile-card {
+      background: #1a1d27; border: 1px solid #2a2d3a;
+      border-radius: 14px; padding: 20px 16px;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 10px;
+      transition: border-color 0.15s; cursor: pointer;
+    }
+    .profile-card:hover { border-color: #7c83fd; }
+    .profile-pic {
+      width: 64px; height: 64px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 700; flex-shrink: 0;
+    }
+    .profile-name { font-size: 13px; font-weight: 600; color: #fff; text-align: center; }
+    .profile-age { font-size: 11px; color: #666; }
+    .profile-score-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; }
+    .profile-score-num { font-size: 18px; font-weight: 700; }
+    .profile-score-bar-bg { width: 100%; height: 4px; background: #2a2d3a; border-radius: 2px; overflow: hidden; }
+    .profile-score-bar-fill { height: 4px; border-radius: 2px; }
+    .profile-tag { font-size: 10px; padding: 2px 10px; border-radius: 10px; font-weight: 600; }
+
+    .calendar-layout { display: flex; gap: 20px; align-items: flex-start; }
+    .calendar-wrap {
+      background: #1a1d27; border: 1px solid #2a2d3a;
+      border-radius: 14px; padding: 20px; width: 360px; flex-shrink: 0;
+    }
+    .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+    .cal-month { font-size: 15px; font-weight: 600; color: #fff; }
+    .cal-nav {
+      background: #22253a; border: 1px solid #2a2d3a; border-radius: 8px;
+      color: #e0e0e0; padding: 5px 12px; cursor: pointer; font-size: 14px;
+      transition: background 0.15s;
+    }
+    .cal-nav:hover { background: #2a2d3a; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+    .cal-day-label { font-size: 11px; color: #555; text-align: center; padding: 4px 0 8px; }
+    .cal-day {
+      aspect-ratio: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      border-radius: 8px; cursor: pointer; font-size: 13px;
+      color: #888; transition: background 0.15s; position: relative; gap: 2px;
+    }
+    .cal-day:hover { background: #22253a; color: #fff; }
+    .cal-day.has-meeting { color: #fff; font-weight: 600; }
+    .cal-day.selected { background: #7c83fd; color: #fff; }
+    .cal-day.selected .meeting-dot { background: #fff; }
+    .cal-day.today { border: 1px solid #7c83fd; color: #7c83fd; }
+    .cal-day.today.selected { color: #fff; }
+    .cal-day.empty { cursor: default; }
+    .cal-day.empty:hover { background: transparent; }
+    .meeting-dot { width: 5px; height: 5px; border-radius: 50%; background: #7c83fd; }
+    .meetings-panel {
+      flex: 1; background: #1a1d27; border: 1px solid #2a2d3a;
+      border-radius: 14px; padding: 20px; min-height: 300px;
+    }
+    .meetings-panel-title { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+    .meetings-panel-sub { font-size: 12px; color: #666; margin-bottom: 18px; }
+    .meeting-card {
+      background: #22253a; border: 1px solid #2a2d3a; border-radius: 10px;
+      padding: 14px 16px; margin-bottom: 10px; display: flex; align-items: center; gap: 14px;
+    }
+    .meeting-time-block {
+      background: #7c83fd22; border-radius: 8px; padding: 8px 12px;
+      text-align: center; flex-shrink: 0;
+    }
+    .meeting-time { font-size: 14px; font-weight: 700; color: #7c83fd; }
+    .meeting-ampm { font-size: 10px; color: #666; }
+    .meeting-info { flex: 1; }
+    .meeting-name { font-size: 13px; font-weight: 600; color: #fff; }
+    .meeting-type { font-size: 11px; color: #666; margin-top: 2px; }
+    .meeting-score-badge { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 10px; }
+    .no-meetings { color: #444; font-size: 13px; text-align: center; padding: 40px 20px; }
+
+    .demo-badge {
+      position: fixed; bottom: 16px; right: 16px;
+      background: #7c83fd; color: #fff; font-size: 11px; font-weight: 600;
+      padding: 6px 14px; border-radius: 20px; z-index: 999;
+      letter-spacing: 0.5px;
+    }
+
+    .user-bar {
+      margin-top: auto; padding: 16px 20px;
+      border-top: 1px solid #2a2d3a;
+    }
+    .user-email { font-size: 11px; color: #666; margin-bottom: 8px; }
+    .logout-btn {
+      font-size: 12px; color: #666; cursor: default;
+      display: flex; align-items: center; gap: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <span>Convale</span>
+      <small>Coach Dashboard</small>
+    </div>
+    <div class="nav-label">Menu</div>
+    <div class="nav-item active" onclick="showPage('dashboard', this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item" onclick="showPage('allleads', this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h8M2 12h10"/></svg>
+      All Leads
+    </div>
+    <div class="nav-item" onclick="showPage('profiles', this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3 2.5-5 6-5s6 2 6 5"/></svg>
+      Profiles
+    </div>
+    <div class="nav-item" onclick="showPage('calls', this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M1 6h14"/></svg>
+      Calls Booked
+    </div>
+    <div class="nav-label">Settings</div>
+    <div class="nav-item" onclick="showPage('settings', this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.2 3.2l1.4 1.4M11.4 11.4l1.4 1.4M3.2 12.8l1.4-1.4M11.4 4.6l1.4-1.4"/></svg>
+      Settings
+    </div>
+    <div class="user-bar">
+      <div class="user-email">demo@convaleai.com</div>
+      <div class="logout-btn">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3M10 11l3-3-3-3M13 8H6"/></svg>
+        Demo mode
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-title">Dashboard</div>
+      <div class="page-sub">Overview of your lead activity</div>
+      <div class="stats-row">
+        <div class="stat">
+          <div class="stat-label">Conversations</div>
+          <div class="stat-value">10</div>
+          <div class="stat-delta neutral">Total tracked</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Qualified Leads</div>
+          <div class="stat-value">6</div>
+          <div class="stat-delta">Score 60+</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Reply Rate</div>
+          <div class="stat-value">70%</div>
+          <div class="stat-delta neutral">High intent %</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Avg Lead Score</div>
+          <div class="stat-value">64</div>
+          <div class="stat-delta neutral">Out of 100</div>
+        </div>
+      </div>
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="chart-title">Lead score distribution</div>
+          <div class="chart-sub">Breakdown by temperature</div>
+          <div class="legend">
+            <span><span class="legend-dot" style="background:#e74c3c"></span>Cold (1–39)</span>
+            <span><span class="legend-dot" style="background:#f39c12"></span>Warm (40–69)</span>
+            <span><span class="legend-dot" style="background:#2ecc71"></span>Hot (70–100)</span>
+          </div>
+          <div style="position:relative;width:100%;height:160px">
+            <canvas id="pieChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Conversations over time</div>
+          <div class="chart-sub">All tracked messages</div>
+          <div style="position:relative;width:100%;height:190px">
+            <canvas id="lineChart"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="leads-section">
+        <div class="section-header">
+          <div class="section-title">Recent qualified leads</div>
+          <div class="section-count">Showing top 5 by score</div>
+        </div>
+        <div id="lead-list"></div>
+      </div>
+    </div>
+
+    <!-- ALL LEADS -->
+    <div class="page" id="page-allleads">
+      <div class="page-title">All Leads</div>
+      <div class="page-sub">Browse and filter every conversation</div>
+      <div class="all-leads-layout">
+        <div class="lead-list-panel">
+          <div class="lead-list-header">
+            <h3>Conversations</h3>
+            <div class="filter-row">
+              <select class="filter-select" id="sortSelect" onchange="renderBubbles()">
+                <option value="high">Score: High to Low</option>
+                <option value="low">Score: Low to High</option>
+              </select>
+            </div>
+          </div>
+          <div class="lead-bubbles" id="lead-bubbles"></div>
+        </div>
+        <div class="conversation-panel" id="convo-panel">
+          <div class="convo-empty">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <p>Select a lead to view their conversation</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROFILES -->
+    <div class="page" id="page-profiles">
+      <div class="page-title">Profiles</div>
+      <div class="page-sub">All leads and their scores at a glance</div>
+      <div class="profiles-grid" id="profiles-grid"></div>
+    </div>
+
+    <!-- CALLS BOOKED -->
+    <div class="page" id="page-calls">
+      <div class="page-title">Calls Booked</div>
+      <div class="page-sub">View and manage your scheduled meetings</div>
+      <div class="calendar-layout">
+        <div class="calendar-wrap">
+          <div class="cal-header">
+            <button class="cal-nav" onclick="changeMonth(-1)">&#8592;</button>
+            <div class="cal-month" id="cal-month-label"></div>
+            <button class="cal-nav" onclick="changeMonth(1)">&#8594;</button>
+          </div>
+          <div class="cal-grid">
+            <div class="cal-day-label">Su</div><div class="cal-day-label">Mo</div>
+            <div class="cal-day-label">Tu</div><div class="cal-day-label">We</div>
+            <div class="cal-day-label">Th</div><div class="cal-day-label">Fr</div>
+            <div class="cal-day-label">Sa</div>
+          </div>
+          <div class="cal-grid" id="cal-days"></div>
+        </div>
+        <div class="meetings-panel" id="meetings-panel">
+          <div class="meetings-panel-title">Select a date</div>
+          <div class="meetings-panel-sub">Click any date on the calendar to see scheduled meetings</div>
+          <div class="no-meetings">No date selected</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="page" id="page-settings">
+      <div class="page-title">Settings</div>
+      <div class="page-sub">Coming soon — configure your scoring preferences</div>
+    </div>
+
+  </div>
+
+  <div class="demo-badge">&#9679; Demo Mode</div>
+
+  <script>
+    const avatarColors = [
+      { bg: "#1a3a5c", text: "#7ec8f7" },
+      { bg: "#1a3a2a", text: "#5edb9a" },
+      { bg: "#2e1a3a", text: "#c47ef7" },
+      { bg: "#3a1a1a", text: "#f77e7e" },
+      { bg: "#3a2e1a", text: "#f7c47e" },
+      { bg: "#1a2e3a", text: "#7ef7e8" },
+      { bg: "#2a3a1a", text: "#b7f77e" },
+    ];
+
+    const fakeLeads = [
+      { name: "Jordan Mills",  age: 24, score100: 91, intent: "high",   time: "Apr 22, 9:14 AM",  message: "I've been feeling really stuck lately and saw your post. How does your coaching program work?",                     reply: "So glad you reached out! My program is 12 weeks and focuses on building clarity, momentum, and accountability. Would you be open to a free discovery call to see if it's the right fit?" },
+      { name: "Taylor Hayes",  age: 31, score100: 78, intent: "high",   time: "Apr 23, 11:02 AM", message: "I've tried a few programs before but never stuck with them. What makes yours different?",                          reply: "That's such a common experience and I totally get it. What makes this different is the personalized weekly check-ins and a system built around your schedule, not a generic plan. Want to chat more?" },
+      { name: "Alex Rivera",   age: 28, score100: 65, intent: "high",   time: "Apr 24, 2:30 PM",  message: "How long does it usually take to see results with your program?",                                                   reply: "Most clients start feeling a shift in the first 2–3 weeks. Real, lasting change typically shows up by week 6. Happy to share some client stories if that helps!" },
+      { name: "Morgan Lee",    age: 35, score100: 82, intent: "high",   time: "Apr 25, 8:45 AM",  message: "I'm a working mom and barely have time. Is this program realistic for someone with my schedule?",                  reply: "100% — that's exactly who I built this for. Sessions are 45 min, flexible, and fit around your life. A lot of my clients are parents with full-time jobs. Let's find a time to talk!" },
+      { name: "Casey Brooks",  age: 22, score100: 55, intent: "low",    time: "Apr 25, 4:10 PM",  message: "How much does it cost?",                                                                                            reply: "Great question! Pricing depends on which package fits your goals. I'd love to walk you through the options on a quick call — no pressure at all, just want to find the right fit for you." },
+      { name: "Riley Quinn",   age: 29, score100: 70, intent: "high",   time: "Apr 26, 10:00 AM", message: "I've been dealing with a lot of anxiety around my career. Is that something you help with?",                      reply: "Yes, career anxiety is something I work with a lot — it's more common than people think. I'd love to have a real conversation about what's going on. Are you free for a call this week?" },
+      { name: "Drew Patel",    age: 33, score100: 44, intent: "low",    time: "Apr 27, 1:15 PM",  message: "Maybe. I'll think about it and get back to you.",                                                                  reply: "Of course, take all the time you need! If it helps, I can send over a free guide on the 3 mindset shifts my clients make in week one — no strings attached." },
+      { name: "Sam Nguyen",    age: 27, score100: 88, intent: "high",   time: "Apr 28, 9:30 AM",  message: "My friend did your program and said it changed her life. I want to feel that way too. Where do I start?",         reply: "That genuinely means so much to hear — she worked incredibly hard! The first step is a free 30-min discovery call so I can understand your goals. Want me to send a booking link?" },
+      { name: "Jamie Torres",  age: 30, score100: 33, intent: "low",    time: "Apr 29, 3:00 PM",  message: "Not sure if coaching is really for me honestly.",                                                                   reply: "That's a fair feeling! A lot of people feel that way before trying it. Would it help if I shared what a typical first session looks like? No commitment — just so you have a better picture." },
+      { name: "Avery Chen",    age: 26, score100: 76, intent: "high",   time: "Apr 30, 8:00 AM",  message: "I've been wanting to make a big life change but don't know where to start. Can you help with that?",              reply: "That's exactly the kind of work I love most. Big changes feel overwhelming until you have a clear starting point — that's what we figure out together. Want to book a free call this week?" },
+    ];
+
+    fakeLeads.forEach((l, i) => {
+      l.origIndex = i;
+      l.initials  = l.name.split(" ").map(w => w[0]).join("");
+    });
+
+    const meetingsData = {
+      "2026-04-22": [
+        { time: "10:00", ampm: "AM", name: "Jordan Mills",  type: "Discovery Call",   score: 91, scoreColor: "#2ecc71", scoreBg: "#1a3a2a" },
+        { time: "2:30",  ampm: "PM", name: "Taylor Hayes",  type: "Strategy Session", score: 78, scoreColor: "#2ecc71", scoreBg: "#1a3a2a" },
+      ],
+      "2026-04-24": [
+        { time: "11:00", ampm: "AM", name: "Alex Rivera",   type: "Intro Call",       score: 65, scoreColor: "#f39c12", scoreBg: "#3a2e1a" },
+      ],
+      "2026-04-28": [
+        { time: "9:00",  ampm: "AM", name: "Morgan Lee",    type: "Follow-up Call",   score: 82, scoreColor: "#2ecc71", scoreBg: "#1a3a2a" },
+        { time: "3:00",  ampm: "PM", name: "Casey Brooks",  type: "Discovery Call",   score: 55, scoreColor: "#f39c12", scoreBg: "#3a2e1a" },
+      ],
+      "2026-05-02": [
+        { time: "1:00",  ampm: "PM", name: "Riley Quinn",   type: "Coaching Consult", score: 70, scoreColor: "#2ecc71", scoreBg: "#1a3a2a" },
+      ],
+      "2026-05-07": [
+        { time: "10:30", ampm: "AM", name: "Drew Patel",    type: "Discovery Call",   score: 44, scoreColor: "#f39c12", scoreBg: "#3a2e1a" },
+        { time: "4:00",  ampm: "PM", name: "Sam Nguyen",    type: "Strategy Session", score: 88, scoreColor: "#2ecc71", scoreBg: "#1a3a2a" },
+      ],
+      "2026-05-14": [
+        { time: "9:30",  ampm: "AM", name: "Jamie Torres",  type: "Intro Call",       score: 33, scoreColor: "#e74c3c", scoreBg: "#3a1a1a" },
+      ],
+    };
+
+    let selectedIndex = null;
+    const today = new Date();
+    let calYear  = today.getFullYear();
+    let calMonth = today.getMonth();
+    let selectedDate = null;
+
+    function scoreColor(s) {
+      if (s >= 70) return "#2ecc71";
+      if (s >= 40) return "#f39c12";
+      return "#e74c3c";
+    }
+
+    function tempTag(s) {
+      if (s >= 90) return { label: "Scorching", bg: "#3a1a1a", color: "#f77e7e" };
+      if (s >= 70) return { label: "Hot",       bg: "#1a3a2a", color: "#5edb9a" };
+      if (s >= 40) return { label: "Warm",      bg: "#3a2e1a", color: "#f7c47e" };
+      return              { label: "Cold",      bg: "#1a2a3a", color: "#7ec8f7" };
+    }
+
+    function showPage(pageId, el) {
+      document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+      document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+      document.getElementById("page-" + pageId).classList.add("active");
+      el.classList.add("active");
+    }
+
+    function renderBubbles() {
+      const sort   = document.getElementById("sortSelect").value;
+      const sorted = [...fakeLeads].sort((a, b) =>
+        sort === "high" ? b.score100 - a.score100 : a.score100 - b.score100
+      );
+      const container = document.getElementById("lead-bubbles");
+      container.innerHTML = "";
+      sorted.forEach(lead => {
+        const av  = avatarColors[lead.origIndex % avatarColors.length];
+        const col = scoreColor(lead.score100);
+        const div = document.createElement("div");
+        div.className = "lead-bubble" + (selectedIndex === lead.origIndex ? " selected" : "");
+        div.onclick = () => openConversation(lead);
+        div.innerHTML = `
+          <div class="bubble-avatar" style="background:${av.bg};color:${av.text}">${lead.initials}</div>
+          <div class="bubble-info">
+            <div class="bubble-name">${lead.name}</div>
+            <div class="bubble-preview">${lead.message}</div>
+          </div>
+          <div class="bubble-score">
+            <span class="bubble-score-num" style="color:${col}">${lead.score100}</span>
+            <span class="bubble-score-label">/ 100</span>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function openConversation(lead) {
+      selectedIndex = lead.origIndex;
+      renderBubbles();
+      const av  = avatarColors[lead.origIndex % avatarColors.length];
+      const col = scoreColor(lead.score100);
+      const tag = tempTag(lead.score100);
+      const panel = document.getElementById("convo-panel");
+      panel.innerHTML = `
+        <div class="convo-header">
+          <div class="convo-header-avatar" style="background:${av.bg};color:${av.text}">${lead.initials}</div>
+          <div class="convo-header-info">
+            <div class="convo-header-name">${lead.name}</div>
+            <div class="convo-header-sub">Last active: ${lead.time}</div>
+          </div>
+          <div class="convo-score-badge" style="background:${tag.bg};color:${tag.color}">
+            ${lead.score100}/100 &mdash; ${tag.label}
+          </div>
+        </div>
+        <div class="convo-messages" id="convo-messages"></div>
+      `;
+      const msgs = document.getElementById("convo-messages");
+      const m1 = document.createElement("div");
+      m1.className = "msg lead";
+      m1.innerHTML = `<div class="msg-label">${lead.name}</div><div class="msg-bubble">${lead.message}</div><div class="msg-time">${lead.time}</div>`;
+      msgs.appendChild(m1);
+      const m2 = document.createElement("div");
+      m2.className = "msg ai";
+      m2.innerHTML = `<div class="msg-label">AI Suggested Reply</div><div class="msg-bubble">${lead.reply}</div><div class="msg-time">${lead.time}</div>`;
+      msgs.appendChild(m2);
+    }
+
+    function renderProfiles() {
+      const grid = document.getElementById("profiles-grid");
+      grid.innerHTML = "";
+      fakeLeads.forEach(lead => {
+        const av  = avatarColors[lead.origIndex % avatarColors.length];
+        const col = scoreColor(lead.score100);
+        const tag = tempTag(lead.score100);
+        const card = document.createElement("div");
+        card.className = "profile-card";
+        card.innerHTML = `
+          <div class="profile-pic" style="background:${av.bg};color:${av.text}">${lead.initials}</div>
+          <div class="profile-name">${lead.name}</div>
+          <div class="profile-age">Age ${lead.age}</div>
+          <div class="profile-score-wrap">
+            <div class="profile-score-num" style="color:${col}">${lead.score100}<span style="font-size:12px;color:#555">/100</span></div>
+            <div class="profile-score-bar-bg">
+              <div class="profile-score-bar-fill" style="width:${lead.score100}%;background:${col}"></div>
+            </div>
+            <div class="profile-tag" style="background:${tag.bg};color:${tag.color}">${tag.label}</div>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function padDate(n) { return String(n).padStart(2, "0"); }
+    function dateKey(y, m, d) { return `${y}-${padDate(m + 1)}-${padDate(d)}`; }
+
+    function renderCalendar() {
+      const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+      document.getElementById("cal-month-label").textContent = `${monthNames[calMonth]} ${calYear}`;
+      const firstDay    = new Date(calYear, calMonth, 1).getDay();
+      const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+      const grid        = document.getElementById("cal-days");
+      grid.innerHTML    = "";
+      for (let i = 0; i < firstDay; i++) {
+        const empty = document.createElement("div");
+        empty.className = "cal-day empty";
+        grid.appendChild(empty);
+      }
+      for (let d = 1; d <= daysInMonth; d++) {
+        const key        = dateKey(calYear, calMonth, d);
+        const hasMeeting = !!meetingsData[key];
+        const isToday    = (d === today.getDate() && calMonth === today.getMonth() && calYear === today.getFullYear());
+        const isSelected = selectedDate === key;
+        const cell       = document.createElement("div");
+        cell.className   = "cal-day" +
+          (hasMeeting ? " has-meeting" : "") +
+          (isToday    ? " today"       : "") +
+          (isSelected ? " selected"    : "");
+        cell.innerHTML = `<span>${d}</span>${hasMeeting ? '<div class="meeting-dot"></div>' : ''}`;
+        cell.onclick   = () => selectDate(key, d);
+        grid.appendChild(cell);
+      }
+    }
+
+    function changeMonth(dir) {
+      calMonth += dir;
+      if (calMonth > 11) { calMonth = 0;  calYear++; }
+      if (calMonth < 0)  { calMonth = 11; calYear--; }
+      renderCalendar();
+    }
+
+    function selectDate(key, day) {
+      selectedDate = key;
+      renderCalendar();
+      const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+      const panel    = document.getElementById("meetings-panel");
+      const meetings = meetingsData[key];
+      const dateLabel = `${monthNames[calMonth]} ${day}, ${calYear}`;
+      if (!meetings || meetings.length === 0) {
+        panel.innerHTML = `
+          <div class="meetings-panel-title">${dateLabel}</div>
+          <div class="meetings-panel-sub">No meetings scheduled</div>
+          <div class="no-meetings">This day is clear — no calls booked.</div>
+        `;
+        return;
+      }
+      let html = `
+        <div class="meetings-panel-title">${dateLabel}</div>
+        <div class="meetings-panel-sub">${meetings.length} meeting${meetings.length > 1 ? "s" : ""} scheduled</div>
+      `;
+      meetings.forEach(m => {
+        html += `
+          <div class="meeting-card">
+            <div class="meeting-time-block">
+              <div class="meeting-time">${m.time}</div>
+              <div class="meeting-ampm">${m.ampm}</div>
+            </div>
+            <div class="meeting-info">
+              <div class="meeting-name">${m.name}</div>
+              <div class="meeting-type">${m.type}</div>
+            </div>
+            <div class="meeting-score-badge" style="background:${m.scoreBg};color:${m.scoreColor}">${m.score}/100</div>
+          </div>
+        `;
+      });
+      panel.innerHTML = html;
+    }
+
+    // ── INIT ──
+    const cold = fakeLeads.filter(l => l.score100 < 40).length;
+    const warm = fakeLeads.filter(l => l.score100 >= 40 && l.score100 < 70).length;
+    const hot  = fakeLeads.filter(l => l.score100 >= 70).length;
+
+    new Chart(document.getElementById("pieChart"), {
+      type: "doughnut",
+      data: {
+        labels: ["Cold","Warm","Hot"],
+        datasets: [{ data: [cold, warm, hot], backgroundColor: ["#e74c3c","#f39c12","#2ecc71"], borderWidth: 0 }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+    });
+
+    new Chart(document.getElementById("lineChart"), {
+      type: "line",
+      data: {
+        labels: ["Apr 22","Apr 23","Apr 24","Apr 25","Apr 26","Apr 27","Apr 28","Apr 29","Apr 30"],
+        datasets: [{
+          data: [1, 1, 1, 2, 1, 1, 2, 1, 1],
+          borderColor: "#7c83fd", backgroundColor: "rgba(124,131,253,0.1)",
+          borderWidth: 2, pointRadius: 4, pointBackgroundColor: "#7c83fd",
+          fill: true, tension: 0.4
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { ticks: { color: "#666", font: { size: 11 } }, grid: { color: "#2a2d3a" }, beginAtZero: true },
+          x: { ticks: { color: "#666", font: { size: 11 } }, grid: { display: false } }
+        }
+      }
+    });
+
+    const topLeads = [...fakeLeads].sort((a, b) => b.score100 - a.score100).slice(0, 5);
+    const list = document.getElementById("lead-list");
+    topLeads.forEach(lead => {
+      const av  = avatarColors[lead.origIndex % avatarColors.length];
+      const col = scoreColor(lead.score100);
+      const tag = tempTag(lead.score100);
+      const row = document.createElement("div");
+      row.className = "lead-row";
+      row.innerHTML = `
+        <div class="avatar" style="background:${av.bg};color:${av.text}">${lead.initials}</div>
+        <div class="lead-info">
+          <div class="lead-name">${lead.name}</div>
+          <div class="lead-time">Last message: ${lead.time}</div>
+        </div>
+        <div class="score-wrap">
+          <div class="score-top">
+            <span class="score-num" style="color:${col}">${lead.score100}/100</span>
+            <span class="score-tag" style="background:${tag.bg};color:${tag.color}">${tag.label}</span>
+          </div>
+          <div class="score-bar-bg">
+            <div class="score-bar-fill" style="width:${lead.score100}%;background:${col}"></div>
+          </div>
+        </div>
+      `;
+      list.appendChild(row);
+    });
+
+    renderBubbles();
+    renderProfiles();
+    renderCalendar();
+  </script>
+</body>
+</html>
